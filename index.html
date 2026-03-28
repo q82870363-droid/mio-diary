@@ -321,10 +321,6 @@
       <input type="date" id="new-date" />
     </div>
     <div class="form-group">
-      <label>标题（中文）/ タイトル</label>
-      <input type="text" id="new-title" placeholder="给这篇日记起个名字…" />
-    </div>
-    <div class="form-group">
       <label>分类 / カテゴリ</label>
       <select id="new-tag">
         <option value="growth">成长 / 成長</option>
@@ -333,17 +329,32 @@
         <option value="health">生病与治疗 / 病気と治療</option>
       </select>
     </div>
-    <div class="form-group">
-      <label>内容（中文）/ 内容</label>
-      <textarea id="new-body" placeholder="用中文记录今天的点点滴滴…"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div>
+        <div class="ja-label" style="margin-bottom:5px;">&#127464;&#127475; 中文标题</div>
+        <input type="text" id="new-title" placeholder="标题（选填）" style="width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;color:var(--ink);background:var(--warm-white);" />
+      </div>
+      <div>
+        <div class="ja-label" style="margin-bottom:5px;">&#127471;&#127477; 日本語タイトル</div>
+        <input type="text" id="new-title-ja" placeholder="タイトル（任意）" style="width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;color:var(--ink);background:var(--warm-white);" />
+      </div>
     </div>
-    <div class="form-group">
-      <div class="ja-label">日文翻译 / 日本語訳</div>
-      <div class="ja-preview" id="ja-preview">点击「自动翻译」，AI将自动翻译成日文 / 「自動翻訳」を押すとAIが翻訳します</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <div class="ja-label" style="margin-bottom:5px;">&#127464;&#127475; 中文内容</div>
+        <textarea id="new-body" placeholder="用中文写…" style="width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;font-family:inherit;min-height:130px;resize:vertical;outline:none;color:var(--ink);background:var(--warm-white);line-height:1.7;"></textarea>
+      </div>
+      <div>
+        <div class="ja-label" style="margin-bottom:5px;">&#127471;&#127477; 日本語内容</div>
+        <textarea id="new-body-ja" placeholder="日本語で書く…" style="width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;font-family:inherit;min-height:130px;resize:vertical;outline:none;color:var(--ink);background:var(--warm-white);line-height:1.7;"></textarea>
+      </div>
+    </div>
+    <div style="background:var(--cream);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--ink-faint);margin-bottom:14px;line-height:1.6;">
+      中文和日文可分别填写，只填一种也可以。点「中&#8594;日翻译」自动填入日文栏。
     </div>
     <div class="modal-btns">
       <button class="btn" onclick="closeModal()">取消 / キャンセル</button>
-      <button class="btn btn-green" onclick="doTranslate()" id="translate-btn">自动翻译 / 自動翻訳</button>
+      <button class="btn btn-green" onclick="doTranslate()" id="translate-btn">中&#8594;日 自动翻译</button>
       <button class="btn btn-accent" onclick="saveEntry()" id="save-btn">保存</button>
     </div>
   </div>
@@ -382,7 +393,6 @@ const TAG_CLASS = {
 let allEntries   = [];
 let currentFilter = 'all';
 let activeLangs   = {};
-let draftJa       = null;
 
 /* ── FIRESTORE REALTIME LISTENER ── */
 const q = query(collection(db,'entries'), orderBy('date','desc'));
@@ -454,12 +464,12 @@ window.filterTag = tag => {
 
 /* ── MODAL ── */
 window.openModal = () => {
-  draftJa = null;
-  document.getElementById('new-date').value  = new Date().toISOString().split('T')[0];
-  document.getElementById('new-title').value = '';
-  document.getElementById('new-body').value  = '';
-  document.getElementById('new-tag').value   = 'growth';
-  document.getElementById('ja-preview').textContent = '点击「自动翻译」，AI将自动翻译成日文 / 「自動翻訳」を押すとAIが翻訳します';
+  document.getElementById('new-date').value     = new Date().toISOString().split('T')[0];
+  document.getElementById('new-title').value    = '';
+  document.getElementById('new-title-ja').value = '';
+  document.getElementById('new-body').value     = '';
+  document.getElementById('new-body-ja').value  = '';
+  document.getElementById('new-tag').value      = 'growth';
   document.getElementById('modal-overlay').style.display = 'flex';
 };
 
@@ -468,56 +478,52 @@ window.closeModal = () => {
 };
 
 /* ── TRANSLATE ── */
+async function googleTranslate(text, from, to) {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data[0].map(s => s[0]).join('');
+}
+
 window.doTranslate = async () => {
   const title = document.getElementById('new-title').value.trim();
   const body  = document.getElementById('new-body').value.trim();
-  if (!body) { alert('请先填写中文内容'); return; }
-  const prev = document.getElementById('ja-preview');
-  const btn  = document.getElementById('translate-btn');
-  prev.textContent = '翻訳中… / 翻译中…';
+  if (!body) { alert('请先填写左侧中文内容 / 左側に中国語を入力してください'); return; }
+  const btn = document.getElementById('translate-btn');
   btn.disabled = true;
-  const prompt = `请将以下育儿日记从中文翻译成自然温暖的日文（日常口语风格）。
-标题：${title||'（无标题）'}
-内容：
-${body}
-只回复翻译，格式：
-タイトル：[翻译标题]
-内容：
-[翻译正文]`;
+  btn.textContent = '翻译中…';
   try {
-    const res  = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000,
-        messages:[{ role:'user', content:prompt }] })
-    });
-    const data = await res.json();
-    const text = data.content.map(c=>c.text||'').join('');
-    const tm = text.match(/タイトル[：:]\s*(.+)/);
-    const bm = text.match(/内容[：:]\s*([\s\S]+)/);
-    draftJa = { title: tm?tm[1].trim():'', body: bm?bm[1].trim():text };
-    prev.textContent = (draftJa.title ? draftJa.title+'\n\n' : '') + draftJa.body;
+    const [jaTitle, jaBody] = await Promise.all([
+      title ? googleTranslate(title, 'zh-CN', 'ja') : Promise.resolve(''),
+      googleTranslate(body, 'zh-CN', 'ja')
+    ]);
+    if (jaTitle) document.getElementById('new-title-ja').value = jaTitle;
+    document.getElementById('new-body-ja').value = jaBody;
   } catch(e) {
-    prev.textContent = '翻译失败，请重试 / 翻訳に失敗しました';
+    alert('翻译失败，请重试 / 翻訳に失敗しました');
   }
   btn.disabled = false;
+  btn.textContent = '中\u2192日 自动翻译';
 };
 
 /* ── SAVE ── */
 window.saveEntry = async () => {
-  const date  = document.getElementById('new-date').value;
-  const title = document.getElementById('new-title').value.trim();
-  const tag   = document.getElementById('new-tag').value;
-  const body  = document.getElementById('new-body').value.trim();
-  if (!date || !body) { alert('请填写日期和内容 / 日付と内容を入力してください'); return; }
+  const date    = document.getElementById('new-date').value;
+  const title   = document.getElementById('new-title').value.trim();
+  const titleJa = document.getElementById('new-title-ja').value.trim();
+  const tag     = document.getElementById('new-tag').value;
+  const body    = document.getElementById('new-body').value.trim();
+  const bodyJa  = document.getElementById('new-body-ja').value.trim();
+  if (!date || (!body && !bodyJa)) {
+    alert('请填写日期和至少一种语言的内容 / 日付と内容（どちらか一方でも可）を入力してください');
+    return;
+  }
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
   btn.textContent = '保存中…';
   try {
     await addDoc(collection(db,'entries'), {
-      date, title, tag, body,
-      titleJa: draftJa?.title || '',
-      bodyJa:  draftJa?.body  || '',
+      date, title, titleJa, tag, body, bodyJa,
       createdAt: serverTimestamp()
     });
     closeModal();

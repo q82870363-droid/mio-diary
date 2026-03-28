@@ -156,7 +156,7 @@
     <div class="hint-box">中文和日文可分别填写，只填一种也可以。点「中→日翻译」自动填入日文栏。</div>
     <div class="modal-btns">
       <button class="btn" onclick="closeModal()">取消 / キャンセル</button>
-      <button class="btn btn-green" onclick="doTranslate()" id="translate-btn">中→日 自动翻译</button>
+      <button class="btn btn-green" onclick="doTranslateZhJa()" id="translate-btn-zhja" style="font-size:12px;padding:7px 10px;">中→日 翻译</button><button class="btn btn-green" onclick="doTranslateJaZh()" id="translate-btn-jazh" style="font-size:12px;padding:7px 10px;">日→中 翻訳</button>
       <button class="btn btn-accent" onclick="saveEntry()" id="save-btn">保存</button>
     </div>
   </div>
@@ -304,11 +304,11 @@ async function googleTranslate(text, from, to) {
   return data[0].map(s => s[0]).join('');
 }
 
-window.doTranslate = async () => {
+window.doTranslateZhJa = async () => {
   const title = document.getElementById('new-title').value.trim();
   const body  = document.getElementById('new-body').value.trim();
   if (!body) { alert('请先填写左侧中文内容'); return; }
-  const btn = document.getElementById('translate-btn');
+  const btn = document.getElementById('translate-btn-zhja');
   btn.disabled = true; btn.textContent = '翻译中…';
   try {
     const [jt, jb] = await Promise.all([
@@ -318,7 +318,24 @@ window.doTranslate = async () => {
     if (jt) document.getElementById('new-title-ja').value = jt;
     document.getElementById('new-body-ja').value = jb;
   } catch { alert('翻译失败，请重试'); }
-  btn.disabled = false; btn.textContent = '中→日 自动翻译';
+  btn.disabled = false; btn.textContent = '中→日';
+};
+
+window.doTranslateJaZh = async () => {
+  const titleJa = document.getElementById('new-title-ja').value.trim();
+  const bodyJa  = document.getElementById('new-body-ja').value.trim();
+  if (!bodyJa) { alert('请先填写右侧日文内容 / 右側に日本語を入力してください'); return; }
+  const btn = document.getElementById('translate-btn-jazh');
+  btn.disabled = true; btn.textContent = '翻译中…';
+  try {
+    const [zt, zb] = await Promise.all([
+      titleJa ? googleTranslate(titleJa,'ja','zh-CN') : Promise.resolve(''),
+      googleTranslate(bodyJa,'ja','zh-CN')
+    ]);
+    if (zt) document.getElementById('new-title').value = zt;
+    document.getElementById('new-body').value = zb;
+  } catch { alert('翻译失败，请重试 / 翻訳に失敗しました'); }
+  btn.disabled = false; btn.textContent = '日→中';
 };
 
 window.saveEntry = async () => {
